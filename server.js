@@ -12,7 +12,7 @@ const CHAT_ID   = "8598761284";
 const SECRET    = "verif2024secure";
 const PORT      = process.env.PORT || 3000;
 // ⬇️ Remplace par ton URL Render après déploiement
-const SERVER_URL = process.env.SERVER_URL || "https://TON-NOM.onrender.com";
+const SERVER_URL = process.env.SERVER_URL || "https://verify-app-d3k0.onrender.com";
 
 // Stockage en mémoire (repart à zéro si le serveur redémarre)
 const approvals = {}; // phone -> true/false
