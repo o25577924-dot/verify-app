@@ -1,0 +1,12 @@
+{
+  "name": "verify-app",
+  "version": "1.0.0",
+  "description": "Serveur de vérification d'accès avec Telegram",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
