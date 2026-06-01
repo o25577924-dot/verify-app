@@ -110,7 +110,7 @@ const server = http.createServer(async (req, res) => {
     req.on("data", (chunk) => (body += chunk));
     req.on("end", async () => {
       try {
-        const { phone } = JSON.parse(body);
+        const { phone, username } = JSON.parse(body);
         if (!phone) return sendJSON(res, 400, { error: "Numéro manquant" });
         const cleanPhone = phone.replace(/[^0-9+]/g, "");
         pending[cleanPhone] = Date.now();
@@ -120,6 +120,7 @@ const server = http.createServer(async (req, res) => {
 
         const message =
           `🔔 *Nouvelle demande d'accès*\n\n` +
+          `👤 Nom : *${username || "Non renseigné"}*\n` +
           `📱 Numéro : \`${cleanPhone}\`\n` +
           `🕐 ${new Date().toLocaleString("fr-FR")}\n\n` +
           `✅ [APPROUVER L'ACCÈS](${approveUrl})\n\n` +
