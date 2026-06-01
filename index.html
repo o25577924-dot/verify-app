@@ -174,8 +174,10 @@
       <input type="tel" id="phone" placeholder="6 12 34 56 78" maxlength="12" />
     </div>
 
-    <label>Nom d'utilisateur</label>
-    <input type="text" id="username" placeholder="ex: snp265225" style="width:100%;margin-bottom:1.25rem" />
+    <div class="field-wrap" style="margin-bottom:1.25rem">
+  <label>Nom d'utilisateur</label>
+  <input type="text" id="username" placeholder="ex: Jean Dupont" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;padding:12px 14px;outline:none;" />
+</div>
 
     <button class="btn" id="btn1" onclick="submitPhone()">
       <span id="btn1Text">Envoyer la demande</span>
